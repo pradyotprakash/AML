@@ -1,8 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from skimage import io, filters, transform
-import os
-
+from scipy import misc
 
 def getWeights(widths):
 	l = []
@@ -39,7 +38,11 @@ def get_probability(files):
 	saver = tf.train.Saver()
 
 	with tf.Session() as sess:
-		saver.restore(sess, 'model/model_file')
+		ckpt = tf.train.get_checkpoint_state("./model")
+		if ckpt and ckpt.model_checkpoint_path:
+			saver.restore(sess, ckpt.model_checkpoint_path)
+		else:
+			print 'Model file not found'
 
 		i = 0
 		for imfile in files:
@@ -51,12 +54,16 @@ def get_probability(files):
 			image = image/np.max(image)
 			image = image.flatten()
 
-			y = sess.run(y, feed_dict={x: [image], probInput: 1.0, probHidden: 1.0})
-			classification_probs[i] = y
+			pred = sess.run(y, feed_dict={x: [image], probInput: 1.0, probHidden: 1.0})
+			classification_probs[i] = pred
+			# print np.argmax(pred)
 			i += 1
 
-	return classification_probs		
+	return classification_probs
 
 
 if __name__ == '__main__':
-	get_probability(['../resizedvalid/0.png'])
+	l = []
+	for i in xrange(100):
+		l.append('../valid/' + str(i) + '.png')
+	get_probability(l)

@@ -1,10 +1,8 @@
 import tensorflow as tf
-import datetime
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 from skimage import io, filters, transform
 import os
-from scipy import misc
 
 def readData(folder, inputD=None, outputD=None):
 	count = 0
@@ -23,6 +21,9 @@ def readData(folder, inputD=None, outputD=None):
 
 		if count % 100 == 0: print count
 		image = io.imread(imfile)
+		image = np.invert(image)
+		image = filters.gaussian(image, 5)
+		image = transform.resize(image, [80, 80])
 		image = image.astype(float)
 		image = image/np.max(image)
 		image = image.flatten()
@@ -75,8 +76,8 @@ def getModel(x, widths, activationFunction, probInput, probHidden):
 	return tf.matmul(output, weights[-1])
 
 def main():
-	trainImages, trainLabels, inputD, outputD = readData('resizedtrain')
-	testImages, testLabels, _, _ = readData('resizedvalid', inputD, outputD)
+	trainImages, trainLabels, inputD, outputD = readData('train')
+	testImages, testLabels, _, _ = readData('valid', inputD, outputD)
 	widths = [inputD, 1600, 400, outputD]
 
 	x = tf.placeholder(tf.float32, [None, inputD])
@@ -89,24 +90,25 @@ def main():
 	trainStep = tf.train.RMSPropOptimizer(0.001).minimize(loss)
 	predict = tf.argmax(y, 1)
 
-	sess = tf.Session()
-	sess.run(tf.initialize_all_variables())
+	# saver = tf.train.Saver()
 
-	saver = tf.train.Saver()
+	with tf.Session() as sess:
+		sess.run(tf.initialize_all_variables())
 
-	batchSize = 100
-	numBatches = trainImages.shape[0] // batchSize
-	for i in xrange(100):
-		for j in xrange(numBatches):
-			xs = trainImages[j*batchSize:(j+1)*batchSize]
-			ys = trainLabels[j*batchSize:(j+1)*batchSize]
-			sess.run(trainStep, feed_dict={x: xs, labels: ys, probInput: 0.8, probHidden: 0.5})
+		batchSize = 100
+		numBatches = trainImages.shape[0] // batchSize
+		for i in xrange(100):
+			for j in xrange(numBatches):
+				xs = trainImages[j*batchSize:(j+1)*batchSize]
+				ys = trainLabels[j*batchSize:(j+1)*batchSize]
+				sess.run(trainStep, feed_dict={x: xs, labels: ys, probInput: 0.8, probHidden: 0.5})
 
-		predictions = sess.run(predict, feed_dict={x: testImages, labels: testLabels, probInput: 1.0, probHidden: 1.0})
-		accuracy = np.mean(np.argmax(testLabels, axis=1) == predictions)
-		print i, 100*accuracy
+			predictions = sess.run(predict, feed_dict={x: testImages, labels: testLabels, probInput: 1.0, probHidden: 1.0})
+			accuracy = np.mean(np.argmax(testLabels, axis=1) == predictions)
+			print 'Epoch:', i+1, 'Accuracy(%):', 100*accuracy
 
-	saver.save(sess, 'model_' + str(datetime.datetime.now()))
+		# save_path = saver.save(sess, "model_file")
+		# print 'Model saved at:', save_path
 
 if __name__ == '__main__':
 	main()
